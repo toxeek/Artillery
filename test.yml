@@ -1,0 +1,14 @@
+config:
+    target: https://artillery.io
+    phases:
+      - duration: 10
+        arrivalRate: 10
+  scenarios:
+    - flow:
+        - get:
+            url: "/"
+            capture:
+            # capturing response using reg expression
+              - regexp: "[^]*"
+                as: "response"
+        - log: "response= {{response}}"
