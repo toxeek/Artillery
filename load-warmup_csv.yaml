@@ -1,0 +1,203 @@
+config:
+    target: https://localhost:3001/consumer/graphql # to be changed
+    processor: "processor_csv.js"
+    payload:
+      path: "./artillery_users.csv"
+      fields:
+        - "email"
+        - "password"
+      order: "sequence"
+      delimeter: ","
+      skipHeader: true
+      cast: false
+    # ensure:
+    #   # we ensure the aggregated latency is no more than 200ms, 200 OK
+    #   p95: 200
+      # to make Artillery exit with a non-zero if the total error rate exceeded 1%
+      maxErrorRate: 1
+    http:
+      pool: 10
+      # maxSockets: 4
+    # variables:
+    #   apitoken:
+    #     - "REPLACE_TOKEN_HERE"
+
+    # phases:
+    #   - duration: 60
+    #     arrivalRate: 1
+    #     name: warm up
+    #   - duration: 60
+    #     arrivalRate: 10
+    #     name: light load
+    #   - duration: 60
+    #     arrivalRate: 1
+    #     rampTo: 10
+    #     name: final test load
+
+      # plugins:
+      #   statsd: 
+      #     host: "localhost"
+      #     port: 8125
+      #     prefix: "artillery"
+
+    environments:
+      paris:
+        target: "https://hj-test-api.democompanydev.com"
+        phases:
+          - duration: 5
+            arrivalRate: 1
+            name: warm up
+          - duration: 5
+            arrivalRate: 1
+            name: light load
+          - duration: 5
+            arrivalRate: 1
+            rampTo: 10
+            name: final test load
+
+      ireland:
+        target: "https://hj-staging-api.democompanydev.com"
+        phases:
+          - duration: 5
+            arrivalRate: 1
+            name: warm up
+          - duration: 5
+            arrivalRate: 10
+            name: light load
+          - duration: 5
+            arrivalRate: 1
+            rampTo: 10
+            name: final test load
+
+      nvirginia:
+        target: "https://hj-test-api.democompanydev.com"
+        phases:
+          - duration: 5
+            arrivalRate: 1
+            name: warm up
+          - duration: 5
+            arrivalRate: 10
+            name: light load
+          - duration: 5
+            arrivalRate: 1
+            rampTo: 10
+            name: final test load
+
+scenarios:
+# we log in the users per scenario, as sign in seems to be idempotent, and captured values are not
+# propagated between scenarios
+# scenario 1
+  - name: "[~] logging virtual users info, and query to HJ cards .."
+    # beforeScenario: 'generateRandomData'
+    flow:
+      - think: 1
+      - log: "using email: {{ email }} and password {{ password }} to kick off the scenario .."
+      - post:
+          url: "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={{ $processEnvironment.FIREBASE_API_TOKEN }}"
+          headers:
+            Content-Type: application/json
+          json:
+            email: "{{ email }}"
+            password: "{{ password }}"
+            returnSecureToken: true
+          capture:
+            - json: "$.idToken"
+              as: "idToken"
+            - json: "$.refreshToken"
+              as: "refreshToken"
+      - log: "idToken captured: {{ idToken }}"
+      - think: 10
+      - post:
+          url: "/consumer/graphql"
+          headers:
+            Content-Type:  application/json
+            Authorization: Bearer {{ idToken }}
+          # beforeRequest: "setJSONBody"
+          json:
+            query: '{    id,    emailAddress,    emailVerified    phoneNumber    wallet {        id    }    legalProfile {        kycStatus    }}\",\"variables\":{}}'
+      - think: 1
+      - post:
+          url: "/consumer/graphql"
+          headers:
+            Content-Type:  application/json
+            Authorization: Bearer {{ idToken }}
+          json:
+            query: 'query QueryHyperJarCards {hyperJarCards{id, lastFourDigits, expiryMonth, expiryYear, issuanceTime, enrollmentTime, shippedDate, status}}\",\"operationName\":\"QueryHyperJarCards\"'
+# scenario 2
+# (capured parameters are not propagated between scenarios)
+  # - name: "[~] registering devices .."
+  #   flow:
+  #     - think: 8
+  #     - log: "using email: {{ email }} and password {{ password }} to kick off the scenario .."
+  #     - post:
+  #         url: "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={{ $processEnvironment.FIREBASE_API_TOKEN }}"
+  #         headers:
+  #           Content-Type: application/json
+  #         json:
+  #           email: "{{ email }}"
+  #           password: "{{ password }}"
+  #           returnSecureToken: true
+  #         capture:
+  #           - json: "$.idToken"
+  #             as: "idToken"
+  #           - json: "$.refreshToken"
+  #             as: "refreshToken"
+  #     - log: "idToken captured: {{ idToken }}"
+  #     - post:
+  #         url: "/consumer/graphql"
+  #         headers:
+  #           Content-Type:  application/json
+  #           Authorization: Bearer {{ idToken }}
+  #         beforeRequest: "beforeScenarioHandler"
+# scenario 3
+# (capured parameters are not propagated between scenarios)
+  - name: "[~] querying parameter groups and devices .."
+    flow:
+      - think: 8
+      - log: "using email: {{ email }} and password {{ password }} to kick off the scenario .."
+      - post:
+          url: "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={{ $processEnvironment.FIREBASE_API_TOKEN }}"
+          headers:
+            Content-Type: application/json
+          json:
+            email: "{{ email }}"
+            password: "{{ password }}"
+            returnSecureToken: true
+          capture:
+            - json: "$.idToken"
+              as: "idToken"
+            - json: "$.refreshToken"
+              as: "refreshToken"
+      - log: "idToken captured: {{ idToken }}"
+      - post:
+          url: "/consumer/graphql"
+          headers:
+            Content-Type:  application/json
+            Authorization: Bearer {{ idToken }}
+          # beforeRequest: "setJSONBody"
+          json:
+            query: 'query QueryPaymentGroups {paymentGroups{items{counterParty{id, companyName}, jar{id, name, balance{currency, baseAmount, rewardAmount, totalAmount}, owner{id, givenName, familyName, emailAddress, avatarUrl}, goal{targetAmount}}, enabled}}},\"operationName\":\"QueryPaymentGroups\"'
+      - log: "[+] querying devices .."
+      - post:
+          url: "/consumer/graphql"
+          headers:
+            Content-Type:  application/json
+            Authorization: Bearer {{ idToken }}
+          # we get an empty reponse (valid request) as we did not register the device (for push notifications)
+          json:
+            query: 'query QueryDevices {devices{items{deviceId, fcmRegistrationToken}}},\"operationName\":\"QueryDevices\"'
+
+          # json:
+          #   query: '{ \"data\": { \"registerDevice\": { \"deviceId\": \"{{ deviceId }}\",\"fcmRegistrationToken\": \"{{ fcmRegistrationToken }}\"}},\"extensions\": {}}'
+      # - log: "[+] querying devices .."
+      # - post:
+      #     url: "/consumer/graphql"
+      #     headers:
+      #       Content-Type:  application/json
+      #       Authorization: Bearer {{ idToken }}
+      #     # we get an empty reponse (valid request) as we did not register the device (for push notifications)
+      #     json:
+      #       query: 'query QueryDevices {devices{items{deviceId, fcmRegistrationToken}}},\"operationName\":\"QueryDevices\"'
+
+
+      

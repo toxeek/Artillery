@@ -1,0 +1,111 @@
+config:
+    target: https://localhost:3001/consumer/graphql # to be changed
+    processor: processor.js
+    ensure:
+      # we ensure the aggregated latency is no more than 200ms, 200 OK
+      p95: 200
+      # to make Artillery exit with a non-zero if the total error rate exceeded 1%
+      maxErrorRate: 1
+    http:
+      pool: 10
+      # maxSockets: 4
+    # variables:
+    #   apitoken:
+    #     - "REPLACE_TOKEN_HERE"
+
+    # phases:
+    #   - duration: 60
+    #     arrivalRate: 1
+    #     name: warm up
+    #   - duration: 60
+    #     arrivalRate: 10
+    #     name: light load
+    #   - duration: 60
+    #     arrivalRate: 1
+    #     rampTo: 10
+    #     name: final test load
+
+      # plugins:
+      #   statsd: 
+      #     host: "localhost"
+      #     port: 8125
+      #     prefix: "artillery"
+
+    environments:
+      paris:
+        target: "https://hj-test-api.democompanydev.com"
+        phases:
+          - duration: 5
+            arrivalRate: 1
+            name: warm up
+          - duration: 5
+            arrivalRate: 1
+            name: light load
+          - duration: 5
+            arrivalRate: 10
+            rampTo: 10
+            name: final test load
+
+      ireland:
+        target: "https://hj-test-api.democompanydev.com"
+        phases:
+          - duration: 5
+            arrivalRate: 1
+            name: warm up
+          - duration: 5
+            arrivalRate: 10
+            name: light load
+          - duration: 5
+            arrivalRate: 1
+            rampTo: 10
+            name: final test load
+
+      nvirginia:
+        target: "https://hj-test-api.democompanydev.com"
+        phases:
+          - duration: 5
+            arrivalRate: 1
+            name: warm up
+          - duration: 5
+            arrivalRate: 10
+            name: light load
+          - duration: 5
+            arrivalRate: 1
+            rampTo: 10
+            name: final test load
+
+scenarios:
+  - name: testing user creation endpoint
+    beforeScenario: 'generateRandomData'
+    flow:
+      # - loop:
+      #    - think: 1
+      - function: 'getIdTokenFunction'
+      - log: "[+] region: {{ $environment }}: request made with {{ name }}, {{ email }}, {{ password }}, {{ phone }}"
+      - post:
+          url: '/consumer/graphql'
+          beforeRequest: 'beforeRequestHandler'
+          headers:
+            Content-Type: application/json
+            Authorization: Bearer {{ idToken }}
+          json:
+            query: "{\n    id,\n    emailAddress,\n    emailVerified\n    phoneNumber\n    wallet {\n        id\n    }\n    legalProfile {\n        kycStatus\n    }\n}"
+          gzip: true
+          expect:
+            # - statusCode: 201
+          # afterResponse: "todo"
+        # count: 3
+      # afterScenario: "cleanupUserData"
+      # - loop:
+      #   - think: 1
+      #   - get:
+      #       url: "/"
+      #       #afterResponse: "./processors/calculateResponseTimeDelta"
+      #       capture:
+      #       # capturing response using reg expression
+      #         - regexp: "[^]*"
+      #           as: "response"
+      #       expect:
+      #         - statusCode: 200
+      #   - log: "response= {{response}}"
+      #   count: 60

@@ -1,0 +1,90 @@
+config:
+    target: https://hj-test-api.democompanydev.com # to be changed
+    tls:
+      rejectUnauthorized: false
+    processor: processor_demo.js
+    ensure:
+      # we ensure the aggregated latency is no more than 200ms, 200 OK
+      p95: 200
+      # to make Artillery exit with a non-zero if the total error rate exceeded 1%
+      maxErrorRate: 1
+    http:
+      pool: 1
+      # maxSockets: 4
+    # variables:
+    #   deleted
+
+      # plugins:
+      #   statsd: 
+      #     host: "localhost"
+      #     port: 8125
+      #     prefix: "artillery"
+
+    environments:
+      paris:
+        target: "https://hj-test-api.democompanydev.com"
+        phases:
+          - duration: 1
+            arrivalRate: 1
+            name: warm up
+          - duration: 1
+            arrivalRate: 1
+            name: light load
+          - duration: 1
+            arrivalRate: 1
+            rampTo: 2
+            name: final test load
+
+      ireland:
+        target: "https://hj-test-api.democompanydev.com"
+        phases:
+          - duration: 60
+            arrivalRate: 1
+            name: warm up
+          - duration: 60
+            arrivalRate: 10
+            name: light load
+          - duration: 60
+            arrivalRate: 1
+            rampTo: 10
+            name: final test load
+
+      nvirginia:
+        target: "https://hj-test-api.democompanydev.com"
+        phases:
+          - duration: 60
+            arrivalRate: 1
+            name: warm up
+          - duration: 60
+            arrivalRate: 10
+            name: light load
+          - duration: 60
+            arrivalRate: 1
+            rampTo: 10
+            name: final test load
+#  before: 
+#   - name: one shot log in 
+#     flow:
+#       - function: "getSingleToken"
+
+scenarios:
+  - name: testing user creation endpoint
+    flow:
+      # - loop:
+      # - think: 2
+      - function: "generateRandomData"
+      - log: "[+] region: {{ $environment }}: request made with {{ name }}, {{ email }}, {{ password }}, {{ phone }}"
+      - log: "[+] idToken: {{ idToken }}, refreshToken: {{ refreshToken }}"
+      - think: 4
+      - post:
+          url: "/consumer/graphql"
+          headers:
+            Content-Type:  application/json
+            Authorization: Bearer {{ idToken }}
+          # beforeRequest: "setJSONBody"
+          json:
+            query: '{    id,    emailAddress,    emailVerified    phoneNumber    wallet {        id    }    legalProfile {        kycStatus    }}","variables":{}}'
+          # gzip: true
+        # count: 20
+    # afterScenario: "afterScenarioHandler"
+
