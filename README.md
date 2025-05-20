@@ -1,6 +1,6 @@
 # Artillery
 
-### SILLY SMALL POC 
+### SMALL POC 
 
 ###  Just a test repository with scenarios and test loads 
 
